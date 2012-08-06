@@ -35,9 +35,13 @@ import wx
 from threading import Thread
 import time
 import configSerial
+import os
 
 keepAlive = True
 keepReading = True
+data = 0
+dataList = []
+maxLength = 1024
 
 class MainWindow(wx.Frame):
     def __init__(self, parent, title="Simple DMM") :
@@ -70,9 +74,9 @@ class MainWindow(wx.Frame):
         self.rootSizer = wx.BoxSizer(wx.VERTICAL)                        
         self.statusBar = self.CreateStatusBar()                              # statusbar in the bottom of the window    
         
-        font = wx.Font(32, wx.MODERN, wx.NORMAL, wx.NORMAL)
+        font = wx.Font(32, wx.TELETYPE, wx.NORMAL, wx.NORMAL)
         
-        self.voltageLabel = wx.StaticText(self.mainPanel, -1, "Voltage:")        
+        self.voltageLabel = wx.StaticText(self.mainPanel, -1, "ADC Value:") 
         self.voltageBox = wx.TextCtrl(self.mainPanel)    
         
         self.voltageLabel.SetFont(font)
@@ -98,8 +102,7 @@ class MainWindow(wx.Frame):
         self.Bind(wx.EVT_MENU, self.onAbout, menuAbout)
         self.Bind(wx.EVT_MENU, self.onExit, menuExit)
         self.Bind(wx.EVT_MENU, self.onOpen, menuOpen)
-        self.Bind(wx.EVT_MENU, self.setupPort, menuPorts)
-        #self.Bind(wx.EVT_MENU, self.resetController, menuReset)
+        self.Bind(wx.EVT_MENU, self.setupPort, menuPorts)        
         self.Bind(wx.EVT_MENU, self.onSave, menuSave)
         
         self.Bind(wx.EVT_BUTTON, self.onStart, self.startButton)
@@ -145,7 +148,18 @@ class MainWindow(wx.Frame):
 	dia.ShowModal()   
       
     def onSave(self, e) :
-	pass
+	global dataList
+	dlg = wx.FileDialog(self, "Choose a file", '.', "", "*.*", \
+                wx.SAVE | wx.OVERWRITE_PROMPT)
+        if dlg.ShowModal() == wx.ID_OK:	  
+	    self.filename = dlg.GetFilename()
+            self.dirname = dlg.GetDirectory()
+            of = open(os.path.join(self.dirname, self.filename),'w')
+            for i in dataList :	      
+	      of.write(i)
+            of.close()
+        dlg.Destroy()
+	  
     
     def onStart(self, e) :
         global keepReading
@@ -155,8 +169,7 @@ class MainWindow(wx.Frame):
         
     def onStop(self, e) :
         global keepReading
-        keepReading = False
-        print "stopped"
+        keepReading = False        
 
     def showComError(self) :     #	Can't open COM port
         dlg = wx.MessageDialog(self, "Could not open COM port!\nCheck the config file", 'Error!', wx.OK | wx.ICON_ERROR)  
@@ -178,20 +191,24 @@ class readData(Thread) :
         self.setDaemon(True)    #  If you don't do this then the thread can get abandoned
         self.parent = parent
         
-    def run(self) :
-        i = 1.000
+    def run(self) :        
         window = self.parent
         global keepAlive
-        while keepAlive and keepReading:
-            print "Running!"
-            i = i + .001            
-            window.voltageBox.SetValue(str(i))
-            time.sleep(0.5)
+        global dataList
+        global maxLength
+        while keepAlive and keepReading:            
+            i = port.ser.readline()  
+            dataList.append(i)
+            if len(dataList) > maxLength :
+	      dataList.pop(0)
+	      
+            window.voltageBox.SetValue(i.strip())
+            #time.sleep(0.1)
 
+if __name__ == '__main__':
+    port = configSerial.Port('dmm.config')
 
-port = configSerial.Port('dmm.config')
+    app = wx.App(False)         # wx instance
+    frame = MainWindow(None)    # main window frame
 
-app = wx.App(False)         # wx instance
-frame = MainWindow(None)    # main window frame
-
-app.MainLoop()
+    app.MainLoop()
