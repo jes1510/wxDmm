@@ -36,6 +36,8 @@ from threading import Thread
 import time
 import configSerial
 import os
+import wx.lib.newevent
+import threading
 
 keepAlive = True
 keepReading = True
@@ -43,11 +45,13 @@ data = 0
 dataList = []
 maxLength = 1024
 
-class MainWindow(wx.Frame):
+NewDataEvent, EVT_NEW_DATA = wx.lib.newevent.NewEvent()
+
+class MainWindow(wx.Frame, Thread):
     def __init__(self, parent, title="Simple DMM") :
         self.parent = parent
         self.read = ''
-        mainFrame = wx.Frame.__init__(self, self.parent, title=title, size=(2048,600)) 
+        mainFrame = wx.Frame.__init__(self, self.parent, title=title, size=(2048,600))
         
         filemenu= wx.Menu()
         setupmenu = wx.Menu()
@@ -107,6 +111,7 @@ class MainWindow(wx.Frame):
         
         self.Bind(wx.EVT_BUTTON, self.onStart, self.startButton)
         self.Bind(wx.EVT_BUTTON, self.onStop, self.stopButton)
+        self.Bind(EVT_NEW_DATA, self.onNewData)
         
         #self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyDown)            
 
@@ -142,6 +147,9 @@ class MainWindow(wx.Frame):
 
     def onOpen(self, e):
         pass
+      
+    def onNewData(self, e) :
+      self.voltageBox.SetValue(dataList[len(dataList)-1].strip())
 
     def setupPort(self, e) :        
 	dia = configSerial.configSerial(self, -1, port)
@@ -165,7 +173,8 @@ class MainWindow(wx.Frame):
         global keepReading
         keepReading = True
         r = readData(self)
-        r.start()
+        if threading.activeCount() < 2 :
+	  r.start()
         
     def onStop(self, e) :
         global keepReading
@@ -193,16 +202,20 @@ class readData(Thread) :
         
     def run(self) :        
         window = self.parent
+        evt = NewDataEvent()
         global keepAlive
         global dataList
         global maxLength
-        while keepAlive and keepReading:            
+        while keepAlive and keepReading:   
+	    
             i = port.ser.readline()  
             dataList.append(i)
             if len(dataList) > maxLength :
 	      dataList.pop(0)
 	      
-            window.voltageBox.SetValue(i.strip())
+	      wx.PostEvent(self.parent, evt)
+	      
+            
             #time.sleep(0.1)
 
 if __name__ == '__main__':
