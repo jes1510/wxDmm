@@ -48,10 +48,11 @@ maxLength = 1024
 NewDataEvent, EVT_NEW_DATA = wx.lib.newevent.NewEvent()
 
 class MainWindow(wx.Frame, Thread):
-    def __init__(self, parent, title="Simple DMM") :
+    def __init__(self, parent, config, title="Simple DMM") :
         self.parent = parent
         self.read = ''
         mainFrame = wx.Frame.__init__(self, self.parent, title=title, size=(2048,600))
+        self.config = config
         
         filemenu= wx.Menu()
         setupmenu = wx.Menu()
@@ -63,6 +64,7 @@ class MainWindow(wx.Frame, Thread):
         menuBar.Append(helpmenu, "Help")
         self.SetMenuBar(menuBar)                            # Adding the MenuBar to the Frame content.
         
+        # Add content to the menuBar
         menuPorts = setupmenu.Append(wx.ID_ANY, "Serial Port", "Change settings");      
         menuOpen = filemenu.Append(wx.ID_OPEN, "&Open"," Open a file to edit")        
         menuSave = filemenu.Append(wx.ID_SAVE, "Save", "Save the current data")     
@@ -70,6 +72,7 @@ class MainWindow(wx.Frame, Thread):
         menuExit = filemenu.Append(wx.ID_EXIT,"E&xit"," Terminate the program")     
         menuAbout = helpmenu.Append(wx.ID_ABOUT, "&About"," Information about this program")  
         
+        # Build the main panel
         self.mainPanel = wx.Panel(self, -1, style=wx.SUNKEN_BORDER)   
         
         #   Build sizers and statusbar
@@ -80,7 +83,7 @@ class MainWindow(wx.Frame, Thread):
         
         font = wx.Font(32, wx.TELETYPE, wx.NORMAL, wx.NORMAL)
         
-        self.voltageLabel = wx.StaticText(self.mainPanel, -1, "ADC Value:") 
+        self.voltageLabel = wx.StaticText(self.mainPanel, -1, "Voltage:") 
         self.voltageBox = wx.TextCtrl(self.mainPanel)    
         
         self.voltageLabel.SetFont(font)
@@ -121,7 +124,7 @@ class MainWindow(wx.Frame, Thread):
         self.rootSizer.Fit(self)     
         
         #	Set preset values
-        self.voltageBox.SetValue('0.000')        
+        self.voltageBox.SetValue('0.00')        
         
         self.Layout()
         self.Show(True)		
@@ -139,11 +142,11 @@ class MainWindow(wx.Frame, Thread):
     def onExit(self, e) :
         global keepAlive
         try :
-            port.ser.close()  	# Needs to be in a try in case it wasn't opened
+            port.ser.close()  		# Needs to be in a try in case it wasn't opened
         except :
             pass
         keepAlive = False
-        self.Destroy()              # wipe out window and dump to the OS
+        self.Destroy()              	# wipe out window and dump to the OS
 
     def onOpen(self, e):
         pass
@@ -172,7 +175,7 @@ class MainWindow(wx.Frame, Thread):
     def onStart(self, e) :
         global keepReading
         keepReading = True
-        r = readData(self)
+        r = readData(self, config)
         if threading.activeCount() < 2 :
 	  r.start()
         
@@ -195,33 +198,64 @@ class MainWindow(wx.Frame, Thread):
 
 
 class readData(Thread) :
-    def __init__(self, parent):
+    def __init__(self, parent, config):
         Thread.__init__(self)
         self.setDaemon(True)    #  If you don't do this then the thread can get abandoned
         self.parent = parent
+        self.evt = NewDataEvent()
+        self.config = config        
         
     def run(self) :        
         window = self.parent
-        evt = NewDataEvent()
         global keepAlive
         global dataList
-        global maxLength
-        while keepAlive and keepReading:   
-	    
-            i = port.ser.readline()  
-            dataList.append(i)
-            if len(dataList) > maxLength :
-	      dataList.pop(0)
-	      
-	      wx.PostEvent(self.parent, evt)
-	      
+        
+        while keepAlive and keepReading:  
+            i = port.ser.readline()             
+            if i :
+	      try :		
+		volts = int(i.strip()) * self.config.vConstant
+		
+		dataList.append(str(round(volts, 2)) + '\n')
+		wx.PostEvent(self.parent, self.evt)
+		
+		if len(dataList) > self.config.maxLength :
+		  dataList.pop(0)
+		  
+	      except :
+		pass
+		
+		
+class configuration() :
+  def __init__(self) :    
+    self.maxLength = 65536
+    self.vConstant = 0.004935519
+    self.configFilename = 'dmm.config'
+    self.configFile = wx.Config(self.configFilename)	# Configfile name.  Default location is home    
+    
+    if self.configFile.Exists('maxLength'):	# If the config file exists then load configuration
+      self.maxLength = self.configFile.ReadInt('maxLength')
+      self.vConstant = self.configFile.ReadFloat('vConstant')
+    
+    else:
+      self.saveOptions()	# create a default file if one doesn't exist
             
-            #time.sleep(0.1)
+    
+  
+  def saveOptions(self) :
+    '''
+    Writes the configuration to the config filename
+    '''
+    self.configFile.WriteInt("maxLength", self.maxLength) 
+    self.configFile.WriteFloat("vConstant", self.vConstant)
+
+		
 
 if __name__ == '__main__':
     port = configSerial.Port('dmm.config')
+    config = configuration()
 
     app = wx.App(False)         # wx instance
-    frame = MainWindow(None)    # main window frame
+    frame = MainWindow(None, config)    # main window frame
 
     app.MainLoop()
