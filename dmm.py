@@ -21,15 +21,15 @@ Here is an awesome wx tutorial I cam acoss while writing this:
 http://wiki.wxpython.org/AnotherTutorial
 
 The program depends on the following modules:
-serial:			Controls data over the virtual serial port
-wx:  			Manages the GUI
-wx.lib.newevent:  	Event manager
-configSerial: 		Configures serial port and manages config file
+serial:         Controls data over the virtual serial port
+wx:             Manages the GUI
+wx.lib.newevent:    Event manager
+configSerial:       Configures serial port and manages config file
 
 '''
 
 import sys
-sys.path.append("~/code/python/configSerial")
+sys.path.append("/home/jesse/code/python/configSerial")
 import serial
 import wx
 from threading import Thread
@@ -39,34 +39,34 @@ import os
 import wx.lib.newevent
 import threading
 
-keepAlive = True
-keepReading = True
-data = 0
-dataList = []
-maxLength = 1024
+keepReading = True      # Keep parallel threads running
+data = 0            # Indidual data point from the serial port
+dataList = []           # Data buffer
 
-NewDataEvent, EVT_NEW_DATA = wx.lib.newevent.NewEvent()
+# Custom events for window
+NewDataEvent, EVT_NEW_DATA = wx.lib.newevent.NewEvent()     # New custom even to signal ther's data in the buffer
+errorEvent, EVT_ERROR = wx.lib.newevent.NewEvent()      # New custom even to signal ther's data in the buffer
 
-class MainWindow(wx.Frame, Thread):
+class MainWindow(wx.Frame, Thread):             # Main window
     def __init__(self, parent, config, title="Simple DMM") :
-        self.parent = parent
+        self.parent = parent                    # parent
         self.read = ''
         mainFrame = wx.Frame.__init__(self, self.parent, title=title, size=(2048,600))
-        self.config = config
+        self.config = config                    # Grab the configuration from the config class
         
-        filemenu= wx.Menu()
+        filemenu= wx.Menu()         # Start setting up menus
         setupmenu = wx.Menu()
         helpmenu = wx.Menu()
 
         menuBar = wx.MenuBar()
-        menuBar.Append(filemenu,"&File")                    # Adding the "filemenu" to the MenuBar   
-        menuBar.Append(setupmenu, "Setup")
-        menuBar.Append(helpmenu, "Help")
-        self.SetMenuBar(menuBar)                            # Adding the MenuBar to the Frame content.
+        menuBar.Append(filemenu,"&File")        # Adding the "filemenu" to the MenuBar   
+        menuBar.Append(setupmenu, "Setup")  # Setup menu
+        menuBar.Append(helpmenu, "Help")    # Help menu
+        self.SetMenuBar(menuBar)                # Adding the MenuBar to the Frame content.
         
         # Add content to the menuBar
         menuPorts = setupmenu.Append(wx.ID_ANY, "Serial Port", "Change settings");      
-        menuOpen = filemenu.Append(wx.ID_OPEN, "&Open"," Open a file to edit")        
+        #menuOpen = filemenu.Append(wx.ID_OPEN, "&Open"," Open a file to edit")        
         menuSave = filemenu.Append(wx.ID_SAVE, "Save", "Save the current data")     
         filemenu.AppendSeparator()
         menuExit = filemenu.Append(wx.ID_EXIT,"E&xit"," Terminate the program")     
@@ -76,17 +76,18 @@ class MainWindow(wx.Frame, Thread):
         self.mainPanel = wx.Panel(self, -1, style=wx.SUNKEN_BORDER)   
         
         #   Build sizers and statusbar
-        self.topSizer = wx.BoxSizer(wx.HORIZONTAL) 
-        self.buttonSizer = wx.BoxSizer(wx.HORIZONTAL)        
-        self.rootSizer = wx.BoxSizer(wx.VERTICAL)                        
-        self.statusBar = self.CreateStatusBar()                              # statusbar in the bottom of the window    
+        self.topSizer = wx.BoxSizer(wx.HORIZONTAL)      # Top sizer holds label and box 
+        self.buttonSizer = wx.BoxSizer(wx.HORIZONTAL)           # Sizer to hold the buttonSizer
+        self.rootSizer = wx.BoxSizer(wx.VERTICAL)               # Main sizer that holds everything
+        self.statusBar = self.CreateStatusBar()         # statusbar in the bottom of the window    
         
-        font = wx.Font(32, wx.TELETYPE, wx.NORMAL, wx.NORMAL)
+        font = wx.Font(32, wx.TELETYPE, wx.NORMAL, wx.NORMAL)   # Custom font for the meter
         
-        self.voltageLabel = wx.StaticText(self.mainPanel, -1, "Voltage:") 
-        self.voltageBox = wx.TextCtrl(self.mainPanel)    
+        self.voltageLabel = wx.StaticText(self.mainPanel, -1, "Voltage:")   # Label for the foltage reading
+        self.voltageBox = wx.TextCtrl(self.mainPanel)               # Box to hold the readings
         
-        self.voltageLabel.SetFont(font)
+        # Set the fonts
+        self.voltageLabel.SetFont(font)             
         self.voltageBox.SetFont(font)
         
         #   Buttons
@@ -99,163 +100,267 @@ class MainWindow(wx.Frame, Thread):
         self.topSizer.Add(self.voltageLabel, 1, wx.EXPAND)
         self.topSizer.Add(self.voltageBox, 1, wx.EXPAND)
         self.buttonSizer.Add(self.startButton, 1, wx.EXPAND)
-        self.buttonSizer.Add(self.stopButton, 1, wx.EXPAND)
-        
+        self.buttonSizer.Add(self.stopButton, 1, wx.EXPAND)        
         self.rootSizer.Add(self.topSizer, 1, wx.EXPAND)
         self.rootSizer.Add(self.buttonSizer, 1, wx.EXPAND) 
           
-        #___________Bind Events_______________________________
+        #  Bind Events
         self.Bind(wx.EVT_CLOSE, self.onExit)        
         self.Bind(wx.EVT_MENU, self.onAbout, menuAbout)
         self.Bind(wx.EVT_MENU, self.onExit, menuExit)
-        self.Bind(wx.EVT_MENU, self.onOpen, menuOpen)
         self.Bind(wx.EVT_MENU, self.setupPort, menuPorts)        
-        self.Bind(wx.EVT_MENU, self.onSave, menuSave)
-        
+        self.Bind(wx.EVT_MENU, self.onSave, menuSave)        
         self.Bind(wx.EVT_BUTTON, self.onStart, self.startButton)
         self.Bind(wx.EVT_BUTTON, self.onStop, self.stopButton)
-        self.Bind(EVT_NEW_DATA, self.onNewData)
-        
+        self.Bind(EVT_NEW_DATA, self.onNewData)             # custom event for new data    
+        self.Bind(EVT_ERROR, self.findError)                # Custom event for errors        
         #self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyDown)            
 
-        # set the sizers
+        #  set the sizers
         self.SetSizer(self.rootSizer)
         self.SetAutoLayout(1)
         self.rootSizer.Fit(self)     
         
-        #	Set preset values
+        #  set preset values
         self.voltageBox.SetValue('0.00')        
         
         self.Layout()
-        self.Show(True)		
-	
+        self.Show(True)     
+    
         try :
-            port.ser = serial.Serial(port.name, port.baud, timeout=port.timeout)
-            time.sleep(2)			# Give the controller
-            port.ser.flushInput()		# Dump anything in the buffer
+            port.ser = serial.Serial(port.name, port.baud, timeout=port.timeout)    # Test the port
+            time.sleep(1)           # Give the controller a second to come up
+            port.ser.flushInput()       # Dump anything in the buffer
             
         except :
-            self.showComError() 		# Throw up a window
+            self.showComError("Unable to open serial port!")        # Throw up a window
            
-        self.statusBar.SetStatusText('Port: ' + port.name )
-
+        
+        self.statusBar.SetStatusText('Port: ' + port.name+ '\tStopped!')
+        
+    def findError(self, e) :
+        '''
+        Error handler for outside events
+        
+        Keyword Arguments:
+        e:  Event
+        '''
+        err = e.attr1
+        if err == "COM Error" : self.showComError(e.attr2)
+        else :  self.showGeneralError(e.attr2)
+        
     def onExit(self, e) :
-        global keepAlive
+        '''
+        Exit event handler
+        
+        Keyword Arguments:
+        e:  Event
+        '''
+        global keepReading
         try :
-            port.ser.close()  		# Needs to be in a try in case it wasn't opened
+            port.ser.close()    # Needs to be in a try in case it wasn't opened
+            
         except :
             pass
-        keepAlive = False
-        self.Destroy()              	# wipe out window and dump to the OS
-
-    def onOpen(self, e):
-        pass
+        
+        keepReading = False # Kill parallel threads
+        self.Destroy()          # wipe out window and dump to the OS
       
     def onNewData(self, e) :
-      self.voltageBox.SetValue(dataList[len(dataList)-1].strip())
+        '''
+        New data event handler
+        
+        Keyword Arguments:
+        e:  Event
+        '''
+        global dataList     # Data buffer
+        self.voltageBox.SetValue(dataList[len(dataList)-1].strip()) # Set the voltage box to the last element
+                                        # in the buffer with trailing characters stripped off
+                    
+        bufferPercent = round((((len(dataList) * 1.0) / self.config.maxLength) * 100), 2)   # Calculate percentage
+                                                    # from the length of the buffer
+                                                    # rounded to 2 places
+        self.statusBar.SetStatusText('Port: ' + port.name + '\tRunning... ' \
+                          '\tBuffer: ' + str(bufferPercent) + '%')  
 
-    def setupPort(self, e) :        
-	dia = configSerial.configSerial(self, -1, port)
-	dia.ShowModal()   
+      
+    def setupPort(self, e) :   
+        '''
+        Serial port setup event handler
+        
+        Keyword Arguments:
+        e:  Event
+        '''
+        dia = configSerial.configSerial(self, -1, port)     # Use the serial port config module to configure
+        dia.ShowModal()   
       
     def onSave(self, e) :
-	global dataList
-	dlg = wx.FileDialog(self, "Choose a file", '.', "", "*.*", \
-                wx.SAVE | wx.OVERWRITE_PROMPT)
-        if dlg.ShowModal() == wx.ID_OK:	  
-	    self.filename = dlg.GetFilename()
-            self.dirname = dlg.GetDirectory()
-            of = open(os.path.join(self.dirname, self.filename),'w')
-            for i in dataList :	      
-	      of.write(i)
+        '''
+        Save Event handler
+        
+        Keyword Arguments
+        e:  Event
+        '''
+        global dataList         # Buffer for the data
+        dlg = wx.FileDialog(self, "Select file", '.', "", "*.*", \
+                    wx.SAVE | wx.OVERWRITE_PROMPT)
+                    
+        if dlg.ShowModal() == wx.ID_OK:   
+            self.filename = dlg.GetFilename()       # set the filename to the selected file
+            self.dirname = dlg.GetDirectory()       # get the directory of the file
+            of = open(os.path.join(self.dirname, self.filename),'w')    
+            for i in dataList :       
+                of.write(i)          
             of.close()
         dlg.Destroy()
-	  
+        
+    def onAbout(self, e) :     #  'About' menu item
+        dlg = wx.MessageDialog(self, "A simple DMM that reads data over a serial port\n", 'About', wx.OK | wx.ICON_INFORMATION)  
+        dlg.ShowModal()
+      
     
     def onStart(self, e) :
+        '''
+        Start Button event handler
+        
+        Keyword Arguments:
+        e:  Event
+        '''
         global keepReading
-        keepReading = True
-        r = readData(self, config)
-        if threading.activeCount() < 2 :
-	  r.start()
+        global dataList     
+        dataList = []               # Clear the data buffer on a fresh start
+        keepReading = True          # Set the flag for parallel threads        
+        if threading.activeCount() < 2 :    # Only start it if there isn't already a thread running
+            r = readData(self, config)      # spawn the data thread
+            r.start()               # Start the thread running
         
     def onStop(self, e) :
-        global keepReading
-        keepReading = False        
+        '''
+        Stop Button event handler
+        
+        Keyword Arguments:
+        e:  Event
+        ''' 
+        global keepReading        
+        keepReading = False             # Kill parallel thread
+        while threading.activeCount() > 1 : # Wait until sll other threads die    
+            pass
 
-    def showComError(self) :     #	Can't open COM port
-        dlg = wx.MessageDialog(self, "Could not open COM port!\nCheck the config file", 'Error!', wx.OK | wx.ICON_ERROR)  
-        dlg.ShowModal()
-        self.setupPort(None)
+        self.statusBar.SetStatusText('Port: ' + port.name + '\tStopped!')   # update the status bar   
+      
     
-    def onAbout(self, e) :     #	Can't open COM port
-        dlg = wx.MessageDialog(self, "A simple DMM that reads data over a serial port\n", 'About', wx.OK | wx.ICON_INFORMATION)  
-        dlg.ShowModal()        
+    def showComError(self, msg) :     # Can't open COM port
+        '''
+        Show a COM Error
+        
+        Keyword Arguments:
+        msg:  The message dialog to be shown
+        '''
+        dlg = wx.MessageDialog(self, msg , 'COM Error!',  wx.OK | wx.ICON_ERROR)  
+        dlg.ShowModal() 
 
-    def showBufferFull(self) :
-        dlg = wx.MessageDialog(self, "Could not open COM port!", 'Error!', wx.OK | wx.ICON_ERROR)
+    def showGeneralError(self, msg) :
+        '''
+        Show a general Error
+        
+        Keyword Arguments:
+        msg:  The message dialog to be shown
+        '''
+        dlg = wx.MessageDialog(self, msg, 'Error!', wx.OK | wx.ICON_ERROR)
         dlg.showModal()
 
 
 class readData(Thread) :
+    '''
+    Class to handle serial port operations in a thread
+    
+    Keyword Arguments:
+    parent:  Parent class of calling window
+    confg:  Configuration class
+    '''
     def __init__(self, parent, config):
-        Thread.__init__(self)
-        self.setDaemon(True)    #  If you don't do this then the thread can get abandoned
-        self.parent = parent
-        self.evt = NewDataEvent()
-        self.config = config        
+        Thread.__init__(self)       #  Initialize as a thread
+        self.setDaemon(True)        #  If you don't do this then the thread can get abandoned
+        self.parent = parent        
+        self.evt = NewDataEvent()   #  Simple name for new data event       
+        self.config = config        #  name the configuration
         
-    def run(self) :        
-        window = self.parent
-        global keepAlive
-        global dataList
+    def run(self) :    
+        '''
+        Called to start thread
+        '''
+        window = self.parent           
+        global dataList             # data buffer
+        global keepReading          # processing flag       
+        mS = 1.0 / float(self.config.minFramerate)  #  Calculate milliseconds from frame rate 
+        lastPost = time.time()      # grab the time
+        s = port.ser                # rename the serial port to save key strokes ;)
         
-        while keepAlive and keepReading:  
-            i = port.ser.readline()             
-            if i :
-	      try :		
-		volts = int(i.strip()) * self.config.vConstant
-		
-		dataList.append(str(round(volts, 2)) + '\n')
-		wx.PostEvent(self.parent, self.evt)
-		
-		if len(dataList) > self.config.maxLength :
-		  dataList.pop(0)
-		  
-	      except :
-		pass
-		
-		
+        try :
+            s.flushInput()          # Dump anything left in the port        
+          
+            while keepReading:      # MAIN LOOP!  Keep running while the flag is set
+                i = s.readline()      # read a line of data from the port       
+                if i :                # If there is data...
+                    try :             # Just ignore stray characters, not graceful but it's simple
+                        volts = int(i.strip()) * self.config.vConstant    # Calculate volts from the constant
+                    except :
+                        continue
+                  
+                    dataList.append(str(round(volts, 2)) + '\n')      # Stick the new data on the end of the buffer   
+                    
+                    if len(dataList) > self.config.maxLength :        # reaper to maintain max length of the buffer
+                        dataList.pop(0)
+                    
+                    if (time.time() - lastPost) > mS :                # If the timer expires then flag the window to update the window
+                        wx.PostEvent(self.parent, self.evt)           # post an event to the window
+                        lastPost = time.time()                        # reset the timer
+                
+                else :
+                    wx.PostEvent(self.parent, errorEvent(attr1="COM Error", attr2="Serial port timeout!"))  # Nothing was read
+                
+        except Exception, detail:       
+            wx.PostEvent(self.parent, errorEvent(attr1="Genral Error", attr2="Error with serial thread!"))  # 
+             
+
+        
+        
 class configuration() :
-  def __init__(self) :    
-    self.maxLength = 65536
-    self.vConstant = 0.004935519
-    self.configFilename = 'dmm.config'
-    self.configFile = wx.Config(self.configFilename)	# Configfile name.  Default location is home    
-    
-    if self.configFile.Exists('maxLength'):	# If the config file exists then load configuration
-      self.maxLength = self.configFile.ReadInt('maxLength')
-      self.vConstant = self.configFile.ReadFloat('vConstant')
-    
-    else:
-      self.saveOptions()	# create a default file if one doesn't exist
-            
-    
-  
-  def saveOptions(self) :
     '''
-    Writes the configuration to the config filename
-    '''
-    self.configFile.WriteInt("maxLength", self.maxLength) 
-    self.configFile.WriteFloat("vConstant", self.vConstant)
+    Configuration class encapsulates configuration data and 
+    manages config file
+    '''  
+    def __init__(self) :       
+        #self.configFilename = os.path.join(sys.argv[0] + '.config')
+        self.configFilename = 'dmm.confg'
+        self.configFile = wx.Config(self.configFilename)  # Open config file.  Default location is home 
+        self.maxLength = 65535                # Max number of readings in buffer
+        self.vConstant = 0.004935519              # Constant to adjust voltage reading       
+        self.minFramerate = 30                # Minimum framerate to maintain on meter                        
+      
+        if self.configFile.Exists('maxLength'):       # If the config file exists then load configuration
+            self.maxLength = self.configFile.ReadInt('maxLength')
+            self.vConstant = self.configFile.ReadFloat('vConstant')
+            self.minFramerate = self.configFile.ReadFloat('minFramerate')
+      
+        else:
+            self.saveOptions()                # create a default file if one doesn't exist           
+      
+    
+    def saveOptions(self) :
+        '''
+        Writes the configuration to the config filename
+        '''
+        self.configFile.WriteInt("maxLength", self.maxLength) 
+        self.configFile.WriteFloat("vConstant", self.vConstant)
+        self.configFile.WriteFloat("minFramerate", self.minFramerate)    
+          
 
-		
-
-if __name__ == '__main__':
-    port = configSerial.Port('dmm.config')
+if __name__ == '__main__':    
     config = configuration()
+    port = configSerial.Port(config.configFilename)
 
-    app = wx.App(False)         # wx instance
-    frame = MainWindow(None, config)    # main window frame
+    app = wx.App(False)                 # wx instance
+    frame = MainWindow(None, config)        # main window frame
 
     app.MainLoop()
