@@ -1,4 +1,4 @@
-Arduino-dmm
+wxDmm
 ===========
 
-A simple digital voltmeter from an arduino
+A simple serial volt meter using wxPython.  
