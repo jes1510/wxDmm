@@ -12,7 +12,11 @@ of http://smileymicros.com/ and I developed it to demonstrate threading and usin
 development for a talk I was going to give at the Knoxville Robotics Club (www.knoxarearobotics.com).
 
 An arduino or other similar microcontroller with a serial connection can be used for the data collection.  
-An example sketch for an Arduino is included in the distribution package for example purposes.
+An example sketch for an Arduino is included in the distribution package for example purposes.  The example
+given for the analogRead() function on the Arduino site works well with wxDmm.  Increase the baud rate 
+to 115200 to improve responsiveness.
+
+http://arduino.cc/en/Reference/analogRead
 
 This system is far from accurate and it is very likely to damage something if used incorrectly.  I am
 not responsible if something goes wrong.
