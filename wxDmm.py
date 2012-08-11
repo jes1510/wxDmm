@@ -321,7 +321,7 @@ class readData(Thread) :
                     except :
                         continue
                     
-                    dataList.append(str(round(volts, 2)))   # Put the voltage in the data buffer                 
+                    dataList.append(str(round(volts, 2))+'\n')   # Put the voltage in the data buffer                 
                     
                     if len(dataList) > self.config.maxLength :          # reaper to maintain max length of the buffer
                         dataList.pop(0)
