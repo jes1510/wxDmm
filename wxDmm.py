@@ -16,7 +16,7 @@ Written by Jesse Merritt
 August 5 , 2012
 www.github.com/jes1510
 
-Reads analog values over a serial port and calcculates a voltage.
+Reads analog values over a serial port and calculates a voltage.
 The values should be terminated with a newline.
 eg:  512\n
 
