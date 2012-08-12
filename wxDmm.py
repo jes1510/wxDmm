@@ -28,15 +28,18 @@ serial:             Controls data over the virtual serial port
 wx:                 Manages the GUI
 wx.lib.newevent:    Event manager
 configSerial:       Configures serial port and manages config file
+
+Download configSerial from here:
+https://github.com/jes1510/wx-configSerial
 '''
 
 import sys
-sys.path.append("/home/jesse/code/python/configSerial")
 import serial
 import wx
 from threading import Thread
 import time
 import configSerial
+
 import os
 import wx.lib.newevent
 import threading
@@ -241,8 +244,7 @@ class MainWindow(wx.Frame, Thread):             # Main window
         keepReading = True                  # Set the flag for parallel threads       
        
         if not running :
-            r = readData(self, self.config)      # spawn the data thread
-            print self.config.vMax
+            r = readData(self, self.config)      # spawn the data thread           
             r.start()                       # Start the thread running
             running = True
         
