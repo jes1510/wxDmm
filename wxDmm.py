@@ -1,3 +1,4 @@
+#!/usr/bin/python
 '''
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,6 +33,7 @@ configSerial:       Configures serial port and manages config file
 Download configSerial from here:
 https://github.com/jes1510/wx-configSerial
 '''
+
 
 import sys
 import serial
