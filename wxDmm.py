@@ -51,8 +51,8 @@ keepReading = True      # Keep parallel threads running
 dataList = []           # Data buffer
 
 # Custom events for window
-NewDataEvent, EVT_NEW_DATA = wx.lib.newevent.NewEvent()     # New custom even to signal ther's data in the buffer
-errorEvent, EVT_ERROR = wx.lib.newevent.NewEvent()          # New custom even to signal ther's data in the buffer
+NewDataEvent, EVT_NEW_DATA = wx.lib.newevent.NewEvent()     # New custom event to signal there's data in the buffer
+errorEvent, EVT_ERROR = wx.lib.newevent.NewEvent()          # New custom even to signal errors 
 
 class MainWindow(wx.Frame, Thread):             # Main window
     def __init__(self, parent, config, title="wxDMM") :        
